@@ -2,22 +2,29 @@ import NIOSSL
 import Fluent
 import FluentMySQLDriver
 import Vapor
+import JWT
 
-// configures your application
 public func configure(_ app: Application) async throws {
-    // uncomment to serve files from /Public folder
-    // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
-
+    let secretKey = Environment.get("JWT_SECRET") ?? "secret"
+    app.jwt.signers.use(.hs256(key: secretKey))
+    
+    let corsConfig = CORSMiddleware.Configuration(
+        allowedOrigin: .all,
+        allowedMethods: [.GET, .POST, .PUT, .DELETE, .OPTIONS],
+        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith]
+    )
+    let cors = CORSMiddleware(configuration: corsConfig)
+    app.middleware.use(cors)  // 👈 미들웨어 등록
+    
     app.databases.use(DatabaseConfigurationFactory.mysql(
-        hostname: Environment.get("DATABASE_HOST") ?? "localhost",
-        port: Environment.get("DATABASE_PORT").flatMap(Int.init(_:)) ?? MySQLConfiguration.ianaPortNumber,
-        username: Environment.get("DATABASE_USERNAME") ?? "vapor_username",
-        password: Environment.get("DATABASE_PASSWORD") ?? "vapor_password",
-        database: Environment.get("DATABASE_NAME") ?? "vapor_database"
+        hostname: "localhost",
+        port: 3307,
+        username: "root",
+        password: "1234",
+        database: "swiftserver",
+        tlsConfiguration: .forClient(certificateVerification: .none)
     ), as: .mysql)
-
-    app.migrations.add(CreateTodo())
-
-    // register routes
+    
+    app.middleware.use(UserAuthenticator())
     try routes(app)
 }
